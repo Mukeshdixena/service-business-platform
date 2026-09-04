@@ -75,13 +75,14 @@ export function MyBookingsPage() {
         <>
           <div className="flex flex-col gap-3">
             {bookingsQuery.data.content.map((booking) => {
-              const labels = lookup(booking.businessId, booking.serviceId)
+              const labels = lookup(booking.businessId, booking.serviceId, booking.resourceId)
               return (
                 <BookingCard
                   key={booking.id}
                   booking={booking}
                   businessLabel={labels.businessName}
                   serviceLabel={labels.serviceName}
+                  resourceLabel={labels.resourceName}
                   actions={
                     customerCanCancel(booking.status) ? (
                       <Button variant="danger" size="sm" onClick={() => setCancelTarget(booking)}>

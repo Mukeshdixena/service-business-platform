@@ -10,10 +10,12 @@ export interface BookingCardProps {
   businessLabel?: string
   serviceLabel?: string
   staffLabel?: string
+  /** Set instead of/alongside staffLabel for a rental booking (booking.resourceId set). */
+  resourceLabel?: string
   actions?: ReactNode
 }
 
-export function BookingCard({ booking, businessLabel, serviceLabel, staffLabel, actions }: BookingCardProps) {
+export function BookingCard({ booking, businessLabel, serviceLabel, staffLabel, resourceLabel, actions }: BookingCardProps) {
   return (
     <div className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
       <div className="min-w-0">
@@ -26,6 +28,7 @@ export function BookingCard({ booking, businessLabel, serviceLabel, staffLabel, 
         {businessLabel && <p className="text-sm text-slate-500">{businessLabel}</p>}
         <p className="mt-1 text-sm text-slate-600">{formatDateTime(booking.startAt)}</p>
         {staffLabel && <p className="text-sm text-slate-500">with {staffLabel}</p>}
+        {resourceLabel && <p className="text-sm text-slate-500">Resource: {resourceLabel}</p>}
         <p className="mt-1 text-sm font-medium text-slate-700">{formatMoney(booking.price, booking.currency)}</p>
         {booking.notes && <p className="mt-1 text-sm italic text-slate-500">&ldquo;{booking.notes}&rdquo;</p>}
       </div>

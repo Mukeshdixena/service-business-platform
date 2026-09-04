@@ -63,6 +63,11 @@ export function Navbar() {
               My Memberships
             </NavLink>
           )}
+          {isAuthenticated && (
+            <NavLink to="/my-classes" className={navLinkClass}>
+              My Classes
+            </NavLink>
+          )}
           {canAccessDashboard && (
             <NavLink to="/dashboard" className={navLinkClass}>
               Dashboard
@@ -105,6 +110,11 @@ export function Navbar() {
             {isAuthenticated && (
               <NavLink to="/my-memberships" className={navLinkClass} onClick={() => setMobileOpen(false)}>
                 My Memberships
+              </NavLink>
+            )}
+            {isAuthenticated && (
+              <NavLink to="/my-classes" className={navLinkClass} onClick={() => setMobileOpen(false)}>
+                My Classes
               </NavLink>
             )}
             {canAccessDashboard && (

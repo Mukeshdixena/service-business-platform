@@ -11,7 +11,8 @@ export type AvailabilityStatus = 'AVAILABLE' | 'UNAVAILABLE'
 
 export interface AvailabilityResponse {
   status: AvailabilityStatus
-  type: 'APPOINTMENT'
+  /** "APPOINTMENT" for staff-scoped availability, "RENTAL" for resource-scoped (Phase 7). */
+  type: 'APPOINTMENT' | 'RENTAL'
   date: string
   slots: AvailabilitySlot[]
 }

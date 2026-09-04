@@ -6,6 +6,7 @@ export interface EntityLabels {
   businessName?: string
   businessSlug?: string
   serviceName?: string
+  resourceName?: string
 }
 
 /**
@@ -25,7 +26,7 @@ export function useEntityLookup() {
   const queryClient = useQueryClient()
 
   return useCallback(
-    (businessId: string, serviceId?: string): EntityLabels => {
+    (businessId: string, serviceId?: string, resourceId?: string | null): EntityLabels => {
       const detailEntries = queryClient.getQueriesData<BusinessPublicDto>({ queryKey: ['discovery', 'business'] })
       for (const [, data] of detailEntries) {
         if (data?.id === businessId) {
@@ -33,6 +34,7 @@ export function useEntityLookup() {
             businessName: data.name,
             businessSlug: data.slug,
             serviceName: serviceId ? data.services?.find((service) => service.id === serviceId)?.name : undefined,
+            resourceName: resourceId ? data.resources?.find((resource) => resource.id === resourceId)?.name : undefined,
           }
         }
       }
@@ -45,6 +47,39 @@ export function useEntityLookup() {
         if (match) return { businessName: match.name, businessSlug: match.slug }
       }
 
+      return {}
+    },
+    [queryClient],
+  )
+}
+
+export interface ClassLookupResult {
+  businessId?: string
+  businessName?: string
+  className?: string
+}
+
+/**
+ * ClassEnrollmentDto (per API_CONTRACT.md) only carries `classId` — no
+ * `businessId`, even though the cancel-enrollment endpoint is scoped at
+ * `/businesses/{businessId}/classes/{classId}/cancel-enrollment`. As with
+ * useEntityLookup above, this resolves both the business id (needed to call
+ * that endpoint at all) and a human label from whatever discovery data is
+ * already cached in this session (the customer browsed/enrolled through that
+ * business's public profile earlier), performing no extra network calls.
+ */
+export function useClassLookup() {
+  const queryClient = useQueryClient()
+
+  return useCallback(
+    (classId: string): ClassLookupResult => {
+      const detailEntries = queryClient.getQueriesData<BusinessPublicDto>({ queryKey: ['discovery', 'business'] })
+      for (const [, data] of detailEntries) {
+        const match = data?.classes?.find((classItem) => classItem.id === classId)
+        if (match) {
+          return { businessId: data?.id, businessName: data?.name, className: match.name }
+        }
+      }
       return {}
     },
     [queryClient],

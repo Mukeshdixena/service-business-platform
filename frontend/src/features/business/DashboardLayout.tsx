@@ -35,6 +35,11 @@ export function DashboardLayout() {
           { to: 'memberships', label: 'Memberships' },
         ]
       : []),
+    ...(capabilities.includes('CAPACITY') ? [{ to: 'attendance', label: 'Attendance' }] : []),
+    ...(capabilities.includes('CLASSES') ? [{ to: 'classes', label: 'Classes' }] : []),
+    ...(capabilities.includes('RESOURCES') || capabilities.includes('RENTALS')
+      ? [{ to: 'resources', label: 'Resources' }]
+      : []),
   ]
 
   return (

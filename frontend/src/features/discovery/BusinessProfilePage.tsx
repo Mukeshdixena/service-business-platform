@@ -4,11 +4,14 @@ import { BusinessHeader } from '../../components/business/BusinessHeader'
 import { HoursTable } from '../../components/business/HoursTable'
 import { ServiceCard } from '../../components/business/ServiceCard'
 import { StaffCard } from '../../components/business/StaffCard'
+import { ClassCard } from '../../components/class/ClassCard'
 import { MembershipPlanCard } from '../../components/membership/MembershipPlanCard'
+import { ResourceCard } from '../../components/resource/ResourceCard'
 import { Button, Card, EmptyState, ErrorState, LoadingSpinner } from '../../components/ui'
 import { useAuth } from '../auth/AuthContext'
 import { queryKeys } from '../../hooks/queryKeys'
 import { useToast } from '../../hooks/useToast'
+import { customerClassApi } from '../../services/api/classApi'
 import { discoveryApi } from '../../services/api/discoveryApi'
 import { customerMembershipApi } from '../../services/api/membershipApi'
 import { customerQueueApi } from '../../services/api/queueApi'
@@ -29,12 +32,28 @@ export function BusinessProfilePage() {
   const business = businessQuery.data
   const hasQueueCapability = Boolean(business?.capabilities.includes('QUEUE'))
   const hasMembershipsCapability = Boolean(business?.capabilities.includes('MEMBERSHIPS'))
+  const hasClassesCapability = Boolean(business?.capabilities.includes('CLASSES'))
+  const hasRentalsCapability = Boolean(
+    business?.capabilities.includes('RESOURCES') || business?.capabilities.includes('RENTALS'),
+  )
 
   const joinQueueMutation = useMutation({
     mutationFn: (serviceId: string) => customerQueueApi.join(business?.id ?? '', { serviceId }),
     onSuccess: () => {
       showToast('You joined the queue.', 'success')
       navigate('/my-queue')
+    },
+    onError: (error: unknown) => showToast(getFriendlyErrorMessage(error), 'error'),
+  })
+
+  const enrollMutation = useMutation({
+    mutationFn: (classId: string) => customerClassApi.enroll(business?.id ?? '', classId),
+    onSuccess: (enrollment) => {
+      showToast(
+        enrollment.status === 'WAITLISTED' ? "You're waitlisted — this class is currently full." : 'Enrolled!',
+        'success',
+      )
+      navigate('/my-classes')
     },
     onError: (error: unknown) => showToast(getFriendlyErrorMessage(error), 'error'),
   })
@@ -65,6 +84,8 @@ export function BusinessProfilePage() {
   // (API_CONTRACT.md), but filter defensively in case a business has the
   // capability enabled with no plans, or the field is omitted entirely.
   const activePlans = business.membershipPlans?.filter((plan) => plan.status === 'ACTIVE') ?? []
+  const upcomingClasses = business.classes?.filter((classItem) => classItem.status === 'SCHEDULED') ?? []
+  const availableResources = business.resources?.filter((resource) => resource.status !== 'UNAVAILABLE') ?? []
 
   function requireAuthThen(action: () => void) {
     if (authStatus !== 'authenticated') {
@@ -97,6 +118,8 @@ export function BusinessProfilePage() {
                 {activeServices.map((service) => {
                   const isQueueEligible =
                     hasQueueCapability && (service.bookingType === 'QUEUE' || service.bookingType === 'WALK_IN')
+                  const isRentalEligible =
+                    hasRentalsCapability && service.bookingType === 'RENTAL' && availableResources.length > 0
                   return (
                     <ServiceCard
                       key={service.id}
@@ -117,6 +140,12 @@ export function BusinessProfilePage() {
                           >
                             Join queue
                           </Button>
+                        ) : isRentalEligible ? (
+                          <Link to={`/rent/${business.slug}?serviceId=${service.id}`}>
+                            <Button variant="secondary" size="sm">
+                              Rent
+                            </Button>
+                          </Link>
                         ) : undefined
                       }
                     />
@@ -159,6 +188,47 @@ export function BusinessProfilePage() {
                         </Button>
                       }
                     />
+                  ))}
+                </div>
+              )}
+            </Card>
+          )}
+
+          {hasClassesCapability && (
+            <Card title="Classes">
+              {upcomingClasses.length === 0 ? (
+                <EmptyState title="No upcoming classes" description="This business hasn't scheduled any classes yet." />
+              ) : (
+                <div className="flex flex-col gap-3">
+                  {upcomingClasses.map((classItem) => (
+                    <ClassCard
+                      key={classItem.id}
+                      classItem={classItem}
+                      action={
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          isLoading={enrollMutation.isPending && enrollMutation.variables === classItem.id}
+                          onClick={() => requireAuthThen(() => enrollMutation.mutate(classItem.id))}
+                        >
+                          {classItem.enrolledCount >= classItem.capacity ? 'Join waitlist' : 'Enroll'}
+                        </Button>
+                      }
+                    />
+                  ))}
+                </div>
+              )}
+            </Card>
+          )}
+
+          {hasRentalsCapability && (
+            <Card title="Resources for rent">
+              {availableResources.length === 0 ? (
+                <EmptyState title="No resources listed" description="This business hasn't listed any rentable resources yet." />
+              ) : (
+                <div className="flex flex-col gap-3">
+                  {availableResources.map((resource) => (
+                    <ResourceCard key={resource.id} resource={resource} />
                   ))}
                 </div>
               )}
