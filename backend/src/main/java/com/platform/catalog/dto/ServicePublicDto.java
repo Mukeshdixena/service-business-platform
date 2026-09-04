@@ -16,6 +16,7 @@ public record ServicePublicDto(
         String currency,
         Integer durationMinutes,
         String bookingType,
+        String pricingUnit,
         String status,
         Instant createdAt,
         Instant updatedAt

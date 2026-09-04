@@ -10,6 +10,7 @@ public record BookingDto(
         UUID customerId,
         UUID serviceId,
         UUID staffId,
+        UUID resourceId,
         Instant startAt,
         Instant endAt,
         String status,

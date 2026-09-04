@@ -1,5 +1,6 @@
 package com.platform.catalog.dto;
 
+import com.platform.catalog.domain.PricingUnit;
 import com.platform.catalog.domain.ServiceBookingType;
 import com.platform.catalog.domain.ServiceStatus;
 import jakarta.validation.constraints.DecimalMin;
@@ -16,6 +17,7 @@ public record UpdateServiceRequest(
         @Pattern(regexp = "^[A-Z]{3}$", message = "must be a 3-letter ISO 4217 code") String currency,
         @Positive(message = "must be positive") Integer durationMinutes,
         ServiceBookingType bookingType,
+        PricingUnit pricingUnit,
         ServiceStatus status
 ) {
 }

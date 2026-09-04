@@ -27,6 +27,14 @@ public class Booking extends BaseEntity {
     @Column(name = "staff_id")
     private UUID staffId;
 
+    /**
+     * The rented asset for a RENTAL booking (CLAUDE_CODE.md §14). Mutually
+     * exclusive with {@code staffId} in practice: appointments are keyed on
+     * staff, rentals on a resource. Null for appointments.
+     */
+    @Column(name = "resource_id")
+    private UUID resourceId;
+
     @Column(name = "start_at", nullable = false)
     private Instant startAt;
 
@@ -54,6 +62,12 @@ public class Booking extends BaseEntity {
 
     public Booking(UUID businessId, UUID customerId, UUID serviceId, UUID staffId, Instant startAt, Instant endAt,
                     BigDecimal price, String currency, String notes) {
+        this(businessId, customerId, serviceId, staffId, null, startAt, endAt, price, currency, notes);
+    }
+
+    public Booking(UUID businessId, UUID customerId, UUID serviceId, UUID staffId, UUID resourceId, Instant startAt,
+                    Instant endAt, BigDecimal price, String currency, String notes) {
+        this.resourceId = resourceId;
         this.businessId = businessId;
         this.customerId = customerId;
         this.serviceId = serviceId;
@@ -92,6 +106,10 @@ public class Booking extends BaseEntity {
 
     public UUID getStaffId() {
         return staffId;
+    }
+
+    public UUID getResourceId() {
+        return resourceId;
     }
 
     public Instant getStartAt() {

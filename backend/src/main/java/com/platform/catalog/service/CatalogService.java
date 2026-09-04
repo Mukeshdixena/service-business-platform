@@ -34,8 +34,9 @@ public class CatalogService {
     @Transactional
     public ServiceDto create(UUID businessId, CreateServiceRequest request) {
         validateDuration(request.bookingType(), request.durationMinutes());
+        validatePricingUnit(request.bookingType(), request.pricingUnit());
         Service service = new Service(businessId, request.name(), request.description(), request.price(),
-                request.currency(), request.durationMinutes(), request.bookingType());
+                request.currency(), request.durationMinutes(), request.bookingType(), request.pricingUnit());
         return toDto(serviceRepository.save(service));
     }
 
@@ -57,9 +58,11 @@ public class CatalogService {
         Service service = getOwned(businessId, serviceId);
         var bookingType = request.bookingType() != null ? request.bookingType() : service.getBookingType();
         var duration = request.durationMinutes() != null ? request.durationMinutes() : service.getDurationMinutes();
+        var pricingUnit = request.pricingUnit() != null ? request.pricingUnit() : service.getPricingUnit();
         validateDuration(bookingType, duration);
+        validatePricingUnit(bookingType, pricingUnit);
         service.applyUpdate(request.name(), request.description(), request.price(), request.currency(),
-                request.durationMinutes(), request.bookingType(), request.status());
+                request.durationMinutes(), request.bookingType(), request.pricingUnit(), request.status());
         return toDto(service);
     }
 
@@ -82,15 +85,27 @@ public class CatalogService {
         }
     }
 
+    /** A RENTAL service's price is meaningless without knowing what period it is quoted per. */
+    private void validatePricingUnit(com.platform.catalog.domain.ServiceBookingType bookingType,
+                                      com.platform.catalog.domain.PricingUnit pricingUnit) {
+        if (bookingType == com.platform.catalog.domain.ServiceBookingType.RENTAL && pricingUnit == null) {
+            throw new ValidationException("pricingUnit: must be HOUR or DAY for RENTAL services");
+        }
+    }
+
     public static ServiceDto toDto(Service s) {
         return new ServiceDto(s.getId(), s.getBusinessId(), s.getName(), s.getDescription(), s.getPrice(),
-                s.getCurrency(), s.getDurationMinutes(), s.getBookingType().name(), s.getStatus().name(),
-                s.getCreatedAt(), s.getUpdatedAt());
+                s.getCurrency(), s.getDurationMinutes(), s.getBookingType().name(), pricingUnitName(s),
+                s.getStatus().name(), s.getCreatedAt(), s.getUpdatedAt());
     }
 
     public static ServicePublicDto toPublicDto(Service s) {
         return new ServicePublicDto(s.getId(), s.getBusinessId(), s.getName(), s.getDescription(), s.getPrice(),
-                s.getCurrency(), s.getDurationMinutes(), s.getBookingType().name(), s.getStatus().name(),
-                s.getCreatedAt(), s.getUpdatedAt());
+                s.getCurrency(), s.getDurationMinutes(), s.getBookingType().name(), pricingUnitName(s),
+                s.getStatus().name(), s.getCreatedAt(), s.getUpdatedAt());
+    }
+
+    private static String pricingUnitName(Service s) {
+        return s.getPricingUnit() != null ? s.getPricingUnit().name() : null;
     }
 }
