@@ -28,8 +28,12 @@ export function ServicesManager() {
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ['businesses', businessId, 'services'] })
 
+  // ServiceFormValues models "no pricing unit chosen" as '' (for the <select> placeholder);
+  // the API contract wants null there instead.
+  const toRequest = (values: ServiceFormValues) => ({ ...values, pricingUnit: values.pricingUnit || null })
+
   const createMutation = useMutation({
-    mutationFn: (values: ServiceFormValues) => catalogApi.create(businessId ?? '', values),
+    mutationFn: (values: ServiceFormValues) => catalogApi.create(businessId ?? '', toRequest(values)),
     onSuccess: () => {
       showToast('Service added.', 'success')
       setModalMode(null)
@@ -39,7 +43,7 @@ export function ServicesManager() {
 
   const updateMutation = useMutation({
     mutationFn: (vars: { id: string; values: ServiceFormValues }) =>
-      catalogApi.update(businessId ?? '', vars.id, vars.values),
+      catalogApi.update(businessId ?? '', vars.id, toRequest(vars.values)),
     onSuccess: () => {
       showToast('Service updated.', 'success')
       setModalMode(null)
