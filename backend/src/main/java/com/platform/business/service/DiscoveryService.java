@@ -8,6 +8,10 @@ import com.platform.business.repository.BusinessLocationRepository;
 import com.platform.business.repository.BusinessRepository;
 import com.platform.business.domain.BusinessCapability;
 import com.platform.catalog.service.CatalogService;
+import com.platform.classes.dto.ClassDto;
+import com.platform.classes.service.ClassService;
+import com.platform.resource.dto.ResourceDto;
+import com.platform.resource.service.ResourceService;
 import com.platform.common.exception.NotFoundException;
 import com.platform.common.pagination.PageResponse;
 import com.platform.membership.dto.MembershipPlanDto;
@@ -37,19 +41,25 @@ public class DiscoveryService {
     private final StaffMemberService staffMemberService;
     private final BusinessHoursService businessHoursService;
     private final MembershipPlanService membershipPlanService;
+    private final ClassService classService;
+    private final ResourceService resourceService;
 
     public DiscoveryService(BusinessRepository businessRepository,
                              BusinessLocationRepository locationRepository,
                              CatalogService catalogService,
                              StaffMemberService staffMemberService,
                              BusinessHoursService businessHoursService,
-                             MembershipPlanService membershipPlanService) {
+                             MembershipPlanService membershipPlanService,
+                             ClassService classService,
+                             ResourceService resourceService) {
         this.businessRepository = businessRepository;
         this.locationRepository = locationRepository;
         this.catalogService = catalogService;
         this.staffMemberService = staffMemberService;
         this.businessHoursService = businessHoursService;
         this.membershipPlanService = membershipPlanService;
+        this.classService = classService;
+        this.resourceService = resourceService;
     }
 
     @Transactional(readOnly = true)
@@ -102,9 +112,20 @@ public class DiscoveryService {
         List<MembershipPlanDto> membershipPlans = b.getCapabilities().contains(BusinessCapability.MEMBERSHIPS)
                 ? membershipPlanService.listActivePublic(b.getId())
                 : List.of();
+        // Same capability-gated pattern: only upcoming SCHEDULED classes, and only
+        // for a CLASSES-capable business.
+        List<ClassDto> classes = b.getCapabilities().contains(BusinessCapability.CLASSES)
+                ? classService.listUpcomingPublic(b.getId())
+                : List.of();
+        // RESOURCES or RENTALS both imply a customer-visible fleet to pick from
+        // when creating a rental booking.
+        List<ResourceDto> resources = b.getCapabilities().contains(BusinessCapability.RESOURCES)
+                || b.getCapabilities().contains(BusinessCapability.RENTALS)
+                ? resourceService.listPublic(b.getId())
+                : List.of();
         return new BusinessPublicDto(b.getId(), b.getName(), b.getSlug(), b.getDescription(), b.getPhone(),
                 b.getEmail(), b.getLogoUrl(), b.getCoverImageUrl(), b.getCategory().name(), capabilities,
-                locations, services, staff, hours, membershipPlans);
+                locations, services, staff, hours, membershipPlans, classes, resources);
     }
 
     private String toLabel(String enumName) {

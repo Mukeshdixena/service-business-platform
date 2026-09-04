@@ -1,6 +1,8 @@
 package com.platform.business.dto;
 
 import com.platform.catalog.dto.ServicePublicDto;
+import com.platform.classes.dto.ClassDto;
+import com.platform.resource.dto.ResourceDto;
 import com.platform.membership.dto.MembershipPlanDto;
 import com.platform.staff.dto.StaffPublicDto;
 
@@ -14,11 +16,14 @@ import java.util.UUID;
  * services/staff/hours by leaving them {@code null}, which Jackson then drops
  * from the JSON entirely (see {@code spring.jackson.default-property-inclusion}).
  *
- * <p>{@code membershipPlans} is always a (possibly empty) list, never null —
- * populated with only {@code ACTIVE} plans, and only when the business has the
- * MEMBERSHIPS capability, in both the summary list and full profile views.
- * It's the only way a customer browses plans before purchasing, since
- * {@code GET /businesses/{businessId}/membership-plans} is OWNER/STAFF-only.
+ * <p>{@code membershipPlans}, {@code classes} and {@code resources} are always
+ * (possibly empty) lists, never null, in both the summary list and full profile
+ * views. Each is populated only when the corresponding capability is enabled:
+ * MEMBERSHIPS -> ACTIVE plans, CLASSES -> upcoming SCHEDULED classes,
+ * RESOURCES/RENTALS -> all non-UNAVAILABLE resources. They are the only way a
+ * customer browses these before purchasing/enrolling/renting, since the
+ * management listings under {@code /businesses/{businessId}/**} are
+ * OWNER/STAFF-only.
  */
 public record BusinessPublicDto(
         UUID id,
@@ -35,6 +40,8 @@ public record BusinessPublicDto(
         List<ServicePublicDto> services,
         List<StaffPublicDto> staff,
         List<BusinessHoursDto> hours,
-        List<MembershipPlanDto> membershipPlans
+        List<MembershipPlanDto> membershipPlans,
+        List<ClassDto> classes,
+        List<ResourceDto> resources
 ) {
 }
