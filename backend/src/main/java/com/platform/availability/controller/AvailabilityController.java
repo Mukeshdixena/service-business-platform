@@ -35,7 +35,8 @@ public class AvailabilityController {
     public AvailabilityResponse getAvailability(@PathVariable UUID businessId,
                                                  @RequestParam UUID serviceId,
                                                  @RequestParam(required = false) UUID staffId,
+                                                 @RequestParam(required = false) UUID resourceId,
                                                  @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
-        return availabilityService.getAvailability(businessId, serviceId, staffId, date);
+        return availabilityService.getAvailability(businessId, serviceId, staffId, resourceId, date);
     }
 }

@@ -10,6 +10,8 @@ import com.platform.business.service.BusinessService;
 import com.platform.catalog.domain.Service;
 import com.platform.catalog.domain.ServiceBookingType;
 import com.platform.catalog.service.CatalogService;
+import com.platform.resource.domain.Resource;
+import com.platform.resource.service.ResourceService;
 import com.platform.staff.domain.StaffMember;
 import com.platform.staff.service.StaffMemberService;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,16 +40,19 @@ public class AvailabilityService {
     private final StaffMemberService staffMemberService;
     private final BusinessHoursRepository businessHoursRepository;
     private final BookingRepository bookingRepository;
+    private final ResourceService resourceService;
 
     public AvailabilityService(BusinessService businessService, CatalogService catalogService,
                                 StaffMemberService staffMemberService,
                                 BusinessHoursRepository businessHoursRepository,
-                                BookingRepository bookingRepository) {
+                                BookingRepository bookingRepository,
+                                ResourceService resourceService) {
         this.businessService = businessService;
         this.catalogService = catalogService;
         this.staffMemberService = staffMemberService;
         this.businessHoursRepository = businessHoursRepository;
         this.bookingRepository = bookingRepository;
+        this.resourceService = resourceService;
     }
 
     @Transactional(readOnly = true)
@@ -149,10 +154,8 @@ public class AvailabilityService {
                 .map(b -> new SlotCalculator.BookedInterval(b.getStartAt(), b.getEndAt()))
                 .toList();
 
-        List<SlotCalculator.OpenInterval> wholeDay =
-                List.of(new SlotCalculator.OpenInterval(LocalTime.MIDNIGHT, LocalTime.MAX));
-        List<SlotDto> slots = SlotCalculator.generate(date, wholeDay, service.getPricingUnit().minutes(), booked,
-                Instant.now(), null);
+        List<SlotDto> slots = SlotCalculator.generateWindow(dayStart, dayEnd, service.getPricingUnit().minutes(),
+                booked, Instant.now(), null);
 
         boolean anyAvailable = slots.stream().anyMatch(SlotDto::available);
         return new AvailabilityResponse(anyAvailable ? "AVAILABLE" : "UNAVAILABLE", "RENTAL", date, slots);
