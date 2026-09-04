@@ -5,6 +5,8 @@ export interface AvailabilitySlot {
   staffId: string | null
 }
 
+/** Rentals reuse the same slot shape; a resource-scoped call has no staffId to report. */
+
 export type AvailabilityStatus = 'AVAILABLE' | 'UNAVAILABLE'
 
 export interface AvailabilityResponse {

@@ -1,4 +1,4 @@
-import type { ServiceBookingType, ServiceStatus } from './enums'
+import type { PricingUnit, ServiceBookingType, ServiceStatus } from './enums'
 
 export interface ServiceDto {
   id: string
@@ -9,6 +9,8 @@ export interface ServiceDto {
   currency: string
   durationMinutes: number | null
   bookingType: ServiceBookingType
+  /** Nullable — required for RENTAL ("HOUR" or "DAY"), ignored otherwise. For RENTAL, `price` is the per-unit rate. */
+  pricingUnit: PricingUnit | null
   status: ServiceStatus
   createdAt: string
   updatedAt: string
@@ -24,6 +26,7 @@ export interface CreateServiceRequest {
   currency: string
   durationMinutes?: number | null
   bookingType: ServiceBookingType
+  pricingUnit?: PricingUnit | null
 }
 
 export type UpdateServiceRequest = Partial<CreateServiceRequest> & {

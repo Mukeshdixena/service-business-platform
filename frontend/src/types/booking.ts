@@ -6,6 +6,8 @@ export interface BookingDto {
   customerId: string
   serviceId: string
   staffId: string | null
+  /** New in Phase 7 — set for RENTAL-type bookings instead of/alongside staffId. */
+  resourceId: string | null
   startAt: string
   endAt: string
   status: BookingStatus
@@ -19,7 +21,11 @@ export interface BookingDto {
 export interface CreateBookingRequest {
   serviceId: string
   staffId?: string | null
+  /** Required for a RENTAL-type service, disallowed for APPOINTMENT. */
+  resourceId?: string | null
   startAt: string
+  /** Required for RENTAL (customer-chosen duration); ignored/computed server-side for APPOINTMENT. */
+  endAt?: string | null
   notes?: string | null
 }
 
