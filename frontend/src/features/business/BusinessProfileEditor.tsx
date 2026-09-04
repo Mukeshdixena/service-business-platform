@@ -36,6 +36,7 @@ export function BusinessProfileEditor() {
           email: businessQuery.data.email ?? '',
           logoUrl: businessQuery.data.logoUrl ?? '',
           coverImageUrl: businessQuery.data.coverImageUrl ?? '',
+          maxCapacity: businessQuery.data.maxCapacity ?? undefined,
         }
       : undefined,
   })
@@ -49,6 +50,7 @@ export function BusinessProfileEditor() {
         email: values.email || null,
         logoUrl: values.logoUrl || null,
         coverImageUrl: values.coverImageUrl || null,
+        maxCapacity: values.maxCapacity ?? null,
       }),
     onSuccess: (business) => {
       queryClient.setQueryData(queryKeys.business(businessId ?? ''), business)
@@ -111,6 +113,16 @@ export function BusinessProfileEditor() {
             <Input label="Logo URL" error={errors.logoUrl?.message} {...register('logoUrl')} />
             <Input label="Cover image URL" error={errors.coverImageUrl?.message} {...register('coverImageUrl')} />
           </div>
+          {business.capabilities.includes('CAPACITY') && (
+            <Input
+              label="Max capacity"
+              type="number"
+              min="1"
+              hint="Maximum number of people allowed on-site at once."
+              error={errors.maxCapacity?.message}
+              {...register('maxCapacity')}
+            />
+          )}
           <Button type="submit" isLoading={updateMutation.isPending} disabled={!isDirty} className="w-full sm:w-auto">
             Save changes
           </Button>

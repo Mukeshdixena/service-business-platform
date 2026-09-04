@@ -40,20 +40,37 @@ public final class SlotCalculator {
         for (OpenInterval interval : openIntervals) {
             Instant intervalStart = date.atTime(interval.openTime()).toInstant(ZoneOffset.UTC);
             Instant intervalEnd = date.atTime(interval.closeTime()).toInstant(ZoneOffset.UTC);
-            Instant slotStart = intervalStart;
-            while (true) {
-                Instant slotEnd = slotStart.plusSeconds(durationMinutes * 60L);
-                if (slotEnd.isAfter(intervalEnd)) {
-                    break;
-                }
-                Instant fixedSlotStart = slotStart;
-                Instant fixedSlotEnd = slotEnd;
-                boolean inPast = fixedSlotStart.isBefore(now);
-                boolean conflicts = existingBookings.stream()
-                        .anyMatch(b -> TimeRangeUtil.overlaps(fixedSlotStart, fixedSlotEnd, b.start(), b.end()));
-                slots.add(new SlotDto(fixedSlotStart, fixedSlotEnd, !inPast && !conflicts, staffId));
-                slotStart = slotEnd;
+            slots.addAll(generateWindow(intervalStart, intervalEnd, durationMinutes, existingBookings, now, staffId));
+        }
+        return slots;
+    }
+
+    /**
+     * Slot generation over an explicit instant window. Used directly for rentals,
+     * whose window is a whole calendar day rather than a business-hours interval
+     * (a rental may run overnight), and by {@link #generate} for each open
+     * interval of an appointment day.
+     */
+    public static List<SlotDto> generateWindow(Instant windowStart,
+                                                Instant windowEnd,
+                                                int durationMinutes,
+                                                List<BookedInterval> existingBookings,
+                                                Instant now,
+                                                UUID trackId) {
+        List<SlotDto> slots = new ArrayList<>();
+        Instant slotStart = windowStart;
+        while (true) {
+            Instant slotEnd = slotStart.plusSeconds(durationMinutes * 60L);
+            if (slotEnd.isAfter(windowEnd)) {
+                break;
             }
+            Instant fixedSlotStart = slotStart;
+            Instant fixedSlotEnd = slotEnd;
+            boolean inPast = fixedSlotStart.isBefore(now);
+            boolean conflicts = existingBookings.stream()
+                    .anyMatch(b -> TimeRangeUtil.overlaps(fixedSlotStart, fixedSlotEnd, b.start(), b.end()));
+            slots.add(new SlotDto(fixedSlotStart, fixedSlotEnd, !inPast && !conflicts, trackId));
+            slotStart = slotEnd;
         }
         return slots;
     }
