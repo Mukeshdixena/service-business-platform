@@ -30,8 +30,5 @@ Thumbs.db
 *.log
 logs/
 
-# Markdown files
-*.md
-
 # AI assistants
 .claude/
