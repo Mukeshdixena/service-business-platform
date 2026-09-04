@@ -1,0 +1,16 @@
+package com.platform.notification.domain;
+
+public enum NotificationType {
+    BOOKING_CONFIRMED,
+    BOOKING_CANCELLED,
+    BOOKING_REMINDER,
+    QUEUE_POSITION_CHANGED,
+    QUEUE_NEXT,
+    QUEUE_READY,
+    MEMBERSHIP_ACTIVATED,
+    MEMBERSHIP_EXPIRING,
+    CLASS_REMINDER,
+    REVIEW_RECEIVED,
+    REVIEW_APPROVED,
+    REVIEW_REJECTED
+}
