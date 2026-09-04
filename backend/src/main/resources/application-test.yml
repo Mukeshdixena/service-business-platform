@@ -1,0 +1,18 @@
+# Used by integration tests. Datasource properties are normally overridden at runtime
+# by the Testcontainers-backed DynamicPropertySource in AbstractIntegrationTest, but a
+# fallback is provided here so the context can also be pointed at a local Postgres if desired.
+spring:
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:55432/service_platform_test}
+    username: ${DATABASE_USERNAME:service_platform}
+    password: ${DATABASE_PASSWORD:service_platform}
+  jpa:
+    show-sql: false
+
+app:
+  jwt:
+    secret: ${JWT_SECRET:test-only-insecure-secret-change-me-please-0123456789}
+
+logging:
+  level:
+    com.platform: INFO
