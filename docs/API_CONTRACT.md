@@ -1,4 +1,4 @@
-# API Contract — Service Business Platform (Phase 1-7)
+# API Contract — Service Business Platform (Phase 1-8)
 
 This is the single source of truth for the backend/frontend boundary. Both sides
 implement strictly against this document. Anything not listed here is out of
@@ -530,3 +530,116 @@ existing bookings instead of a staff member's.
   rental must be after `startAt`.
 - Enrolling in a class beyond `capacity` waitlists rather than rejects; a
   `CANCELLED`/`COMPLETED` class cannot accept new enrollments.
+
+---
+
+# Phase 8 — Reviews, Notifications, Admin, Payments
+
+## Review DTOs
+
+### ReviewDto
+```json
+{ "id": "uuid", "businessId": "uuid", "customerId": "uuid", "bookingId": "uuid",
+  "rating": 5, "comment": "Great service!", "status": "PENDING",
+  "createdAt": "...", "updatedAt": "..." }
+```
+`rating` is 1-5. `status` is one of `PENDING`, `APPROVED`, `REJECTED`.
+`CreateReviewRequest`: `{ bookingId, rating, comment (nullable) }` — the booking
+must be `COMPLETED`, must belong to the caller, and must not already have a review.
+
+### ReviewStatus
+```text
+PENDING, APPROVED, REJECTED
+```
+
+## Notification DTOs
+
+### NotificationDto
+```json
+{ "id": "uuid", "type": "BOOKING_CONFIRMED", "title": "Booking confirmed",
+  "message": "Your booking at Glow Salon has been confirmed.",
+  "referenceType": "BOOKING", "referenceId": "uuid",
+  "isRead": false, "createdAt": "..." }
+```
+
+### NotificationType
+```text
+BOOKING_CONFIRMED, BOOKING_CANCELLED, BOOKING_REMINDER,
+QUEUE_POSITION_CHANGED, QUEUE_NEXT, QUEUE_READY,
+MEMBERSHIP_ACTIVATED, MEMBERSHIP_EXPIRING, CLASS_REMINDER,
+REVIEW_RECEIVED, REVIEW_APPROVED, REVIEW_REJECTED
+```
+
+## Admin DTOs
+
+### AdminBusinessDto
+```json
+{ "id": "uuid", "name": "...", "slug": "...", "category": "SALON",
+  "status": "ACTIVE", "verificationStatus": "VERIFIED", "createdAt": "..." }
+```
+
+### PlatformStatsDto
+```json
+{ "totalBusinesses": 42, "activeBusinesses": 38, "totalUsers": 150,
+  "totalBookings": 1200, "pendingReviews": 5 }
+```
+
+## Payment DTOs
+
+### PaymentDto
+```json
+{ "id": "uuid", "businessId": "uuid", "customerId": "uuid",
+  "referenceType": "BOOKING", "referenceId": "uuid",
+  "amount": 200.00, "currency": "INR", "status": "PENDING",
+  "provider": null, "providerReference": null,
+  "createdAt": "...", "updatedAt": "..." }
+```
+
+### PaymentReferenceType
+```text
+BOOKING, MEMBERSHIP, RENTAL, OTHER
+```
+
+### PaymentStatus
+```text
+PENDING, SUCCESS, FAILED, REFUNDED, PARTIALLY_REFUNDED
+```
+
+## Review endpoints
+```
+POST   /businesses/{businessId}/reviews/{id}/approve  -> 200 ReviewDto  (OWNER)
+POST   /businesses/{businessId}/reviews/{id}/reject   -> 200 ReviewDto  (OWNER)
+GET    /businesses/{businessId}/reviews?status=        -> 200 PageResponse<ReviewDto>  (OWNER/STAFF)
+
+POST   /me/reviews                                     -> 201 ReviewDto  (customer, own completed booking)
+GET    /me/reviews                                      -> 200 PageResponse<ReviewDto>  (own reviews)
+```
+A customer may only review a `COMPLETED` booking they own, and only once per booking.
+Reviews start as `PENDING` and must be approved/rejected by the business owner.
+
+## Notification endpoints
+```
+GET    /me/notifications?from=&page=&size=   -> 200 PageResponse<NotificationDto>
+GET    /me/notifications/unread-count         -> 200 { "count": 3 }
+POST   /me/notifications/read-all             -> 204
+```
+
+## Admin endpoints
+```
+GET    /admin/stats                                    -> 200 PlatformStatsDto  (ADMIN)
+GET    /admin/businesses?status=&page=&size=           -> 200 PageResponse<AdminBusinessDto>  (ADMIN)
+POST   /admin/businesses/{id}/verify?status=VERIFIED   -> 200 AdminBusinessDto  (ADMIN)
+POST   /admin/businesses/{id}/suspend                  -> 200 AdminBusinessDto  (ADMIN)
+POST   /admin/businesses/{id}/activate                 -> 200 AdminBusinessDto  (ADMIN)
+```
+
+## Payment endpoints
+```
+GET    /payments/{id}                      -> 200 PaymentDto  (authenticated)
+POST   /payments/{id}/simulate-success     -> 200 PaymentDto  (ADMIN, MVP simulation only)
+```
+
+## New error codes
+```
+REVIEW_DUPLICATE  (409) — customer already reviewed this booking
+```

@@ -113,3 +113,6 @@ export type ResourceStatus = (typeof RESOURCE_STATUSES)[number]
 
 export const PRICING_UNITS = ['HOUR', 'DAY'] as const
 export type PricingUnit = (typeof PRICING_UNITS)[number]
+
+export const REVIEW_STATUSES = ['PENDING', 'APPROVED', 'REJECTED'] as const
+export type ReviewStatus = (typeof REVIEW_STATUSES)[number]

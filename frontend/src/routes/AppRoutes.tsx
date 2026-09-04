@@ -18,10 +18,14 @@ import { BookingsManager } from '../features/dashboard/BookingsManager'
 import { ClassRosterPage } from '../features/dashboard/ClassRosterPage'
 import { MembershipsManager } from '../features/dashboard/MembershipsManager'
 import { QueueManager } from '../features/dashboard/QueueManager'
+import { ReviewsManager } from '../features/dashboard/ReviewsManager'
 import { BusinessProfilePage } from '../features/discovery/BusinessProfilePage'
 import { BusinessSearchPage } from '../features/discovery/BusinessSearchPage'
 import { MyMembershipsPage } from '../features/membership/MyMembershipsPage'
+import { NotificationsPage } from '../features/notification/NotificationsPage'
 import { MyQueuePage } from '../features/queue/MyQueuePage'
+import { MyReviewsPage } from '../features/review/MyReviewsPage'
+import { AdminDashboard } from '../features/admin/AdminDashboard'
 import { LoginPage } from './LoginPage'
 import { NotFoundPage } from './NotFoundPage'
 import { RegisterPage } from './RegisterPage'
@@ -44,6 +48,9 @@ export function AppRoutes() {
           <Route path="/my-queue" element={<MyQueuePage />} />
           <Route path="/my-memberships" element={<MyMembershipsPage />} />
           <Route path="/my-classes" element={<MyClassesPage />} />
+          <Route path="/my-reviews" element={<MyReviewsPage />} />
+          <Route path="/notifications" element={<NotificationsPage />} />
+          <Route path="/admin" element={<AdminDashboard />} />
           <Route path="/dashboard" element={<DashboardHome />} />
 
           <Route path="/dashboard/:businessId" element={<RequireBusinessAccess />}>
@@ -61,6 +68,7 @@ export function AppRoutes() {
               <Route path="classes" element={<ClassesManager />} />
               <Route path="classes/:classId/roster" element={<ClassRosterPage />} />
               <Route path="resources" element={<ResourcesManager />} />
+              <Route path="reviews" element={<ReviewsManager />} />
             </Route>
           </Route>
         </Route>

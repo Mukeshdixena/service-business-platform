@@ -1,7 +1,8 @@
 # ARCHITECTURE.md — Service Business Platform Backend
 
-This document describes the architecture actually implemented for Phases 1-5
-(Foundation, Services, Appointments, Queue, Memberships) of `CLAUDE_CODE.md`,
+This document describes the architecture actually implemented for Phases 1-8
+(Foundation, Services, Appointments, Queue, Memberships, Gym Operations,
+Rental, Reviews, Notifications, Admin, Payments) of `CLAUDE_CODE.md`,
 against the interface frozen in `docs/API_CONTRACT.md`. Where a decision
 wasn't fully specified by either document, the choice made and its rationale
 is recorded here.
@@ -85,6 +86,14 @@ resource    — the Resource aggregate (bookable physical assets: JCBs, cars,
               Bookings carrying a `resourceId` (see section 11)
 customer    — CustomerProfile (platform-wide identity) + BusinessCustomer
               (per-business relationship), auto-created on first booking
+review      — Review aggregate with moderation workflow (PENDING/APPROVED/REJECTED),
+              tied to completed bookings, one per booking
+notification— Notification entity with type/title/message, in-app delivery,
+              read state tracking, bulk mark-all-as-read
+admin       — Admin platform stats and business moderation (verify/suspend/activate),
+              requires PLATFORM role ADMIN
+payment     — Payment aggregate as a separate domain, polymorphic reference
+              (BOOKING/MEMBERSHIP/RENTAL/OTHER), simulated provider for MVP
 common      — exception (ApiException hierarchy + GlobalExceptionHandler),
               security (JWT filter/service, CurrentUser, BusinessAccessService
               lives in `business` since it needs BusinessMembershipRepository),
@@ -451,22 +460,72 @@ services/staff/plans are already retired — historical bookings keep a valid
 foreign key.
 
 
-## 12. What's deferred to later phases
+## 12. Reviews (Phase 8)
 
-Per the assignment's scope, the following `CLAUDE_CODE.md` entities/phases are
-**not** implemented and have **no** database tables yet: `Review`,
-`Notification`, real payment-provider integration, and platform Admin APIs.
-(`Attendance`, `Resource`, and `Class`/`ClassEnrollment` were added in
-Phases 6-7 — see sections 10 and 11.) The
-`BusinessCapability` and `BusinessCategory` enums already declare every value
-those phases will need (`RENTALS`, `CLASSES`, `CAPACITY`, `RESOURCES`,
-`PAYMENTS`), so enabling a capability on a business today is
-forward-compatible with those phases without a schema migration to the enum
-itself. `ServiceBookingType` similarly already includes `REQUEST`/`RENTAL` —
-`QUEUE`/`WALK_IN` have working queue-join logic, and both `APPOINTMENT` and
-(as of Phase 7) `RENTAL` have working availability/booking logic. `REQUEST`
-remains stored-but-inert.
+Reviews belong to completed customer/business interactions (`CLAUDE_CODE.md` §23).
+Each review is tied to a specific booking, ensuring only eligible customers
+(completed booking, one per booking) can submit one.
 
-`Business.status` also already models `SUSPENDED`/`ARCHIVED` for the future
-admin/moderation phase, even though this pass only exercises the
-`DRAFT → ACTIVE` publish transition.
+`Review` entity has a `ReviewStatus` enum: `PENDING → APPROVED / REJECTED`.
+Reviews start as `PENDING` on customer submission and require business owner
+approval or rejection. This provides built-in moderation as required by §23.
+
+The unique constraint on `booking_id` enforces one review per booking at the
+database level. The application layer additionally verifies:
+- The booking is `COMPLETED`
+- The booking belongs to the calling customer
+- No prior review exists for this booking+customer pair
+
+## 13. Notifications (Phase 8)
+
+Notifications are an in-app delivery mechanism (`CLAUDE_CODE.md` §24). The
+`Notification` entity stores type, title, message, and an optional reference
+to the related domain object (e.g., a booking or membership).
+
+Notification generation is triggered by domain events (booking confirmed,
+membership activated, etc.) via direct calls from the relevant service classes.
+The notification service is decoupled from delivery providers — initial delivery
+is in-app only, with the architecture supporting future WebSocket/SSE push
+and external providers (SMS, email, WhatsApp).
+
+Read state is tracked via an `is_read` boolean. Bulk mark-all-as-read is
+implemented as a single `UPDATE` query.
+
+## 14. Admin APIs (Phase 8)
+
+Admin endpoints are protected by `@PreAuthorize("hasRole('ADMIN')")` and
+provide business moderation (verify/reject/suspend/activate) and platform
+stats. The admin role is a global `PlatformRole.ADMIN` that bypasses all
+business-membership checks (`BusinessAccessService` returns `true`
+unconditionally for admins — see section 3).
+
+Admin verification flows: `UNVERIFIED → VERIFIED` or `UNVERIFIED → REJECTED`.
+Business suspension: `ACTIVE → SUSPENDED`. Reactivation: `SUSPENDED → ACTIVE`.
+
+## 15. Payments (Phase 8)
+
+Payments are modeled as a separate domain (`CLAUDE_CODE.md` §22) with a clean
+service interface. The `Payment` entity tracks amount, currency, status,
+provider, and a polymorphic reference (`referenceType` + `referenceId`) to
+the related booking, membership, or rental.
+
+For MVP, payments are simulated — the `simulateSuccess` endpoint (admin-only)
+marks a `PENDING` payment as `SUCCESS` with a generated provider reference.
+This allows the full payment flow to be tested without real provider
+integration. The `PaymentService` is designed so a real provider adapter can
+be plugged in later without changing callers.
+
+The `paymentId` column on `Membership` (already nullable from Phase 5) can now
+be populated when a membership is purchased through a payment flow.
+
+## 16. What's deferred to later phases
+
+The following are **not** implemented:
+- Real payment-provider integration (Stripe, Razorpay, etc.) — the interface
+  is ready but the adapter is a simulation
+- WebSocket/SSE real-time push for notifications and queue updates
+- Analytics/reporting dashboard
+- File upload for images (logo, cover, resource images)
+- Automatic waitlist promotion for classes
+- Geo-search for discovery
+- Email/SMS/WhatsApp notification delivery

@@ -40,6 +40,7 @@ export function DashboardLayout() {
     ...(capabilities.includes('RESOURCES') || capabilities.includes('RENTALS')
       ? [{ to: 'resources', label: 'Resources' }]
       : []),
+    { to: 'reviews', label: 'Reviews' },
   ]
 
   return (

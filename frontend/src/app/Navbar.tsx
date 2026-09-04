@@ -68,6 +68,21 @@ export function Navbar() {
               My Classes
             </NavLink>
           )}
+          {isAuthenticated && (
+            <NavLink to="/my-reviews" className={navLinkClass}>
+              My Reviews
+            </NavLink>
+          )}
+          {isAuthenticated && (
+            <NavLink to="/notifications" className={navLinkClass}>
+              Notifications
+            </NavLink>
+          )}
+          {isAuthenticated && user?.roles.includes('ADMIN') && (
+            <NavLink to="/admin" className={navLinkClass}>
+              Admin
+            </NavLink>
+          )}
           {canAccessDashboard && (
             <NavLink to="/dashboard" className={navLinkClass}>
               Dashboard
@@ -115,6 +130,21 @@ export function Navbar() {
             {isAuthenticated && (
               <NavLink to="/my-classes" className={navLinkClass} onClick={() => setMobileOpen(false)}>
                 My Classes
+              </NavLink>
+            )}
+            {isAuthenticated && (
+              <NavLink to="/my-reviews" className={navLinkClass} onClick={() => setMobileOpen(false)}>
+                My Reviews
+              </NavLink>
+            )}
+            {isAuthenticated && (
+              <NavLink to="/notifications" className={navLinkClass} onClick={() => setMobileOpen(false)}>
+                Notifications
+              </NavLink>
+            )}
+            {isAuthenticated && user?.roles.includes('ADMIN') && (
+              <NavLink to="/admin" className={navLinkClass} onClick={() => setMobileOpen(false)}>
+                Admin
               </NavLink>
             )}
             {canAccessDashboard && (

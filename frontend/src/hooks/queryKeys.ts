@@ -5,6 +5,7 @@ import type {
   ClassListParams,
   MembershipListParams,
   QueueEntryListParams,
+  ReviewListParams,
 } from '../types'
 
 /**
@@ -54,4 +55,14 @@ export const queryKeys = {
   myClassEnrollments: ['me', 'class-enrollments'] as const,
 
   businessResources: (businessId: string, page: number) => ['businesses', businessId, 'resources', page] as const,
+
+  businessReviews: (businessId: string, params?: ReviewListParams) =>
+    ['businesses', businessId, 'reviews', params] as const,
+  myReviews: (params?: ReviewListParams) => ['me', 'reviews', params] as const,
+
+  notifications: (params?: { page?: number; size?: number }) => ['me', 'notifications', params] as const,
+  notificationsUnreadCount: ['me', 'notifications', 'unread-count'] as const,
+
+  adminStats: ['admin', 'stats'] as const,
+  adminBusinesses: (params?: { status?: string; page?: number }) => ['admin', 'businesses', params] as const,
 }

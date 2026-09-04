@@ -133,6 +133,10 @@ public class Business extends BaseEntity {
         return status;
     }
 
+    public void setStatus(BusinessStatus status) {
+        this.status = status;
+    }
+
     public void publish() {
         this.status = BusinessStatus.ACTIVE;
     }
@@ -143,6 +147,10 @@ public class Business extends BaseEntity {
 
     public VerificationStatus getVerificationStatus() {
         return verificationStatus;
+    }
+
+    public void setVerificationStatus(VerificationStatus verificationStatus) {
+        this.verificationStatus = verificationStatus;
     }
 
     public Integer getMaxCapacity() {

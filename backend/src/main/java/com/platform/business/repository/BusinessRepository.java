@@ -50,4 +50,8 @@ public interface BusinessRepository extends JpaRepository<Business, UUID> {
                            @Param("query") String query,
                            @Param("city") String city,
                            Pageable pageable);
+
+    Page<Business> findByStatus(BusinessStatus status, Pageable pageable);
+
+    long countByStatus(BusinessStatus status);
 }

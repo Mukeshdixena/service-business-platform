@@ -1,7 +1,7 @@
-# DATABASE.md — Schema Overview (Phases 1-7)
+# DATABASE.md — Schema Overview (Phases 1-8)
 
 PostgreSQL, schema owned entirely by Flyway migrations under
-`backend/src/main/resources/db/migration/` (`V1` … `V13`). Hibernate's
+`backend/src/main/resources/db/migration/` (`V1` … `V16`). Hibernate's
 `ddl-auto` is `validate` in every profile — the application never generates or
 alters schema itself (`CLAUDE_CODE.md` §38). Every table has server-generated
 `UUID` primary keys (never sequential integers, to avoid IDOR-by-enumeration —
@@ -250,15 +250,45 @@ business ──< business_capability
          ──< attendance (business_id, customer_id)
          ──< class_session ──< class_enrollment (class_id, customer_id)
          ──< resource ──< booking (resource_id, nullable — set for RENTAL bookings)
+         ──< review (business_id, customer_profile_id, booking_id)
+         ──< notification (user_id)
+         ──< payment (business_id, customer_profile_id)
 ```
 
-## Deliberate omissions this phase
+## V14 — Reviews
 
-No tables exist yet for `review`, `notification`, or `payment` — these belong
-to Phase 8 per `CLAUDE_CODE.md` §42 and are intentionally out of scope for
-this migration set. (`attendance`, `class_session`/`class_enrollment` and
-`resource` arrived in V9-V11 as part of Phases 6-7.) No `CASCADE` deletes are configured on any
-foreign key: business/service/staff deletion is not implemented in this phase
+| Table | Purpose |
+|---|---|
+| `review` | Customer review of a completed booking (`CLAUDE_CODE.md` §23). `rating` (1-5), `comment` (nullable), `status` (`PENDING`/`APPROVED`/`REJECTED`). Unique on `booking_id` — one review per booking. Only `COMPLETED` bookings can be reviewed. |
+
+Indexes: `uq_review_per_booking` (unique),
+`idx_review_business_id`, `idx_review_customer_id`,
+`idx_review_status`, `idx_review_business_status`.
+
+## V15 — Notifications
+
+| Table | Purpose |
+|---|---|
+| `notification` | In-app notification (`CLAUDE_CODE.md` §24). `type` (enum), `title`, `message`, optional `reference_type`/`reference_id` for linking to the related domain object. `is_read` boolean for read state. |
+
+Indexes: `idx_notification_user_id`,
+`idx_notification_user_read` (for unread count),
+`idx_notification_user_created` (for recency ordering).
+
+## V16 — Payments
+
+| Table | Purpose |
+|---|---|
+| `payment` | Payment record as a separate domain (`CLAUDE_CODE.md` §22). `reference_type` (`BOOKING`/`MEMBERSHIP`/`RENTAL`/`OTHER`) + `reference_id` for polymorphic reference. `amount`, `currency`, `status` (`PENDING`/`SUCCESS`/`FAILED`/`REFUNDED`/`PARTIALLY_REFUNDED`), optional `provider`/`provider_reference`. For MVP, payments are simulated (no real provider integration). |
+
+Indexes: `idx_payment_business_id`, `idx_payment_customer_id`,
+`idx_payment_reference` (on reference_type + reference_id),
+`idx_payment_status`.
+
+## Deliberate omissions
+
+No `CASCADE` deletes are configured on any foreign key:
+business/service/staff deletion is not implemented in this phase
 (services, staff, and membership plans are soft-deleted via a `status` flip to
 `INACTIVE`; resources to `UNAVAILABLE` and classes to `CANCELLED`), so there was no scenario yet that required cascading behavior,
 and adding it without a real delete path would only obscure future intent.
