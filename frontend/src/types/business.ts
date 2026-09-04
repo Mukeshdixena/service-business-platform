@@ -1,4 +1,6 @@
+import type { ClassDto } from './class'
 import type { MembershipPlanDto } from './membership'
+import type { ResourceDto } from './resource'
 import type { ServicePublicDto } from './service'
 import type { StaffPublicDto } from './staff'
 import type { BusinessCapability, BusinessCategory, BusinessStatus, DayOfWeek, VerificationStatus } from './enums'
@@ -17,6 +19,8 @@ export interface BusinessDto {
   capabilities: BusinessCapability[]
   status: BusinessStatus
   verificationStatus: VerificationStatus
+  /** Nullable; only meaningful when the CAPACITY capability is enabled. Must be > 0 when set. */
+  maxCapacity: number | null
   createdAt: string
   updatedAt: string
 }
@@ -46,6 +50,10 @@ export interface BusinessPublicDto {
    * management listing, not for customer browsing).
    */
   membershipPlans?: MembershipPlanDto[]
+  /** Only populated when CLASSES is enabled; only upcoming SCHEDULED classes. */
+  classes?: ClassDto[]
+  /** Only populated when RESOURCES/RENTALS is enabled; all non-UNAVAILABLE resources. */
+  resources?: ResourceDto[]
 }
 
 export interface LocationDto {
@@ -92,6 +100,8 @@ export interface CreateBusinessRequest {
   phone?: string | null
   email?: string | null
   category: BusinessCategory
+  /** Only meaningful with the CAPACITY capability; > 0 when set. */
+  maxCapacity?: number | null
 }
 
 export interface UpdateBusinessRequest {
@@ -101,4 +111,5 @@ export interface UpdateBusinessRequest {
   email?: string | null
   logoUrl?: string | null
   coverImageUrl?: string | null
+  maxCapacity?: number | null
 }
