@@ -1,4 +1,11 @@
-import type { BookingListParams, BusinessSearchParams, MembershipListParams, QueueEntryListParams } from '../types'
+import type {
+  AttendanceListParams,
+  BookingListParams,
+  BusinessSearchParams,
+  ClassListParams,
+  MembershipListParams,
+  QueueEntryListParams,
+} from '../types'
 
 /**
  * Central registry of react-query keys. Keeping these in one place (rather
@@ -35,4 +42,16 @@ export const queryKeys = {
   businessMemberships: (businessId: string, params: MembershipListParams) =>
     ['businesses', businessId, 'memberships', params] as const,
   myMemberships: ['me', 'memberships'] as const,
+
+  businessAttendance: (businessId: string, params?: AttendanceListParams) =>
+    ['businesses', businessId, 'attendance', params] as const,
+  businessCapacity: (businessId: string) => ['businesses', businessId, 'capacity'] as const,
+
+  businessClasses: (businessId: string, params?: ClassListParams) =>
+    ['businesses', businessId, 'classes', params] as const,
+  classEnrollments: (businessId: string, classId: string) =>
+    ['businesses', businessId, 'classes', classId, 'enrollments'] as const,
+  myClassEnrollments: ['me', 'class-enrollments'] as const,
+
+  businessResources: (businessId: string, page: number) => ['businesses', businessId, 'resources', page] as const,
 }
