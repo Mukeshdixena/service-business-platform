@@ -138,6 +138,116 @@ class CrossTenantAuthorizationIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isNotFound());
     }
 
+    @Test
+    void ownerBCannotReadOrMutateOwnerAsAttendanceClassesOrResources() throws Exception {
+        String ownerAToken = registerAndGetAccessToken(uniqueEmail("acr-owner-a"), "password123", "Owner A", "BUSINESS_OWNER");
+        String ownerBToken = registerAndGetAccessToken(uniqueEmail("acr-owner-b"), "password123", "Owner B", "BUSINESS_OWNER");
+
+        MvcResult result = mockMvc.perform(post("/api/v1/businesses")
+                        .header("Authorization", bearer(ownerAToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "name", "A Gym And Rentals",
+                                "category", "GYM",
+                                "capabilities", List.of("CAPACITY", "CLASSES", "RESOURCES"),
+                                "maxCapacity", 100))))
+                .andExpect(status().isCreated())
+                .andReturn();
+        String businessAId = objectMapper.readTree(result.getResponse().getContentAsString()).get("id").asText();
+
+        // B cannot read A's live occupancy.
+        mockMvc.perform(get("/api/v1/businesses/" + businessAId + "/capacity")
+                        .header("Authorization", bearer(ownerBToken)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("FORBIDDEN"));
+
+        // B cannot list or write A's attendance.
+        mockMvc.perform(get("/api/v1/businesses/" + businessAId + "/attendance")
+                        .header("Authorization", bearer(ownerBToken)))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post("/api/v1/businesses/" + businessAId + "/attendance/check-in")
+                        .header("Authorization", bearer(ownerBToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("customerId", java.util.UUID.randomUUID()))))
+                .andExpect(status().isForbidden());
+
+        // B cannot list or create A's classes.
+        mockMvc.perform(get("/api/v1/businesses/" + businessAId + "/classes")
+                        .header("Authorization", bearer(ownerBToken)))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post("/api/v1/businesses/" + businessAId + "/classes")
+                        .header("Authorization", bearer(ownerBToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "name", "Sneaky Class",
+                                "startAt", java.time.Instant.now().plusSeconds(86400).toString(),
+                                "endAt", java.time.Instant.now().plusSeconds(90000).toString(),
+                                "capacity", 5))))
+                .andExpect(status().isForbidden());
+
+        // B cannot list or create A's resources.
+        mockMvc.perform(get("/api/v1/businesses/" + businessAId + "/resources")
+                        .header("Authorization", bearer(ownerBToken)))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post("/api/v1/businesses/" + businessAId + "/resources")
+                        .header("Authorization", bearer(ownerBToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("name", "Sneaky JCB"))))
+                .andExpect(status().isForbidden());
+
+        // A can still read their own (the rule is not overly broad).
+        mockMvc.perform(get("/api/v1/businesses/" + businessAId + "/capacity")
+                        .header("Authorization", bearer(ownerAToken)))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void aCustomerCannotCancelAnotherCustomersClassEnrollment() throws Exception {
+        String ownerToken = registerAndGetAccessToken(uniqueEmail("ce-owner"), "password123", "Owner", "BUSINESS_OWNER");
+        MvcResult result = mockMvc.perform(post("/api/v1/businesses")
+                        .header("Authorization", bearer(ownerToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "name", "Enrollment Studio",
+                                "category", "ACADEMY",
+                                "capabilities", List.of("CLASSES")))))
+                .andExpect(status().isCreated())
+                .andReturn();
+        String businessId = objectMapper.readTree(result.getResponse().getContentAsString()).get("id").asText();
+
+        java.time.Instant startAt = java.time.Instant.now().plusSeconds(86400);
+        MvcResult classResult = mockMvc.perform(post("/api/v1/businesses/" + businessId + "/classes")
+                        .header("Authorization", bearer(ownerToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "name", "Pilates",
+                                "startAt", startAt.toString(),
+                                "endAt", startAt.plusSeconds(3600).toString(),
+                                "capacity", 10))))
+                .andExpect(status().isCreated())
+                .andReturn();
+        String classId = objectMapper.readTree(classResult.getResponse().getContentAsString()).get("id").asText();
+
+        String enrolledCustomer = registerAndGetAccessToken(uniqueEmail("ce-c1"), "password123", "C1", "CUSTOMER");
+        String otherCustomer = registerAndGetAccessToken(uniqueEmail("ce-c2"), "password123", "C2", "CUSTOMER");
+
+        mockMvc.perform(post("/api/v1/businesses/" + businessId + "/classes/" + classId + "/enroll")
+                        .header("Authorization", bearer(enrolledCustomer)))
+                .andExpect(status().isCreated());
+
+        // The other customer's cancel only ever targets their OWN enrollment, so
+        // it cannot touch someone else's — it simply finds nothing.
+        mockMvc.perform(post("/api/v1/businesses/" + businessId + "/classes/" + classId + "/cancel-enrollment")
+                        .header("Authorization", bearer(otherCustomer)))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("NOT_FOUND"));
+
+        // A non-member customer cannot mark attendance on the roster either.
+        mockMvc.perform(get("/api/v1/businesses/" + businessId + "/classes/" + classId + "/enrollments")
+                        .header("Authorization", bearer(otherCustomer)))
+                .andExpect(status().isForbidden());
+    }
+
     private String createBusiness(String ownerToken, String name) throws Exception {
         MvcResult result = mockMvc.perform(post("/api/v1/businesses")
                         .header("Authorization", bearer(ownerToken))
