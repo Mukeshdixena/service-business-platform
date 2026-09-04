@@ -1,5 +1,12 @@
 import { z } from 'zod'
-import { BUSINESS_CATEGORIES, DAYS_OF_WEEK, MEMBERSHIP_DURATION_UNITS, SERVICE_BOOKING_TYPES } from '../../types'
+import {
+  BUSINESS_CATEGORIES,
+  DAYS_OF_WEEK,
+  MEMBERSHIP_DURATION_UNITS,
+  PRICING_UNITS,
+  RESOURCE_STATUSES,
+  SERVICE_BOOKING_TYPES,
+} from '../../types'
 
 // -- Create business --------------------------------------------------------
 
@@ -21,6 +28,11 @@ export const businessProfileSchema = z.object({
   email: z.union([z.literal(''), z.string().email('Enter a valid email address')]),
   logoUrl: z.string(),
   coverImageUrl: z.string(),
+  // '' means "leave unset"; only shown/submitted when the CAPACITY capability is enabled.
+  maxCapacity: z.preprocess(
+    (value) => (value === '' || value === undefined || value === null ? undefined : Number(value)),
+    z.number().int('Must be a whole number').positive('Must be greater than 0').optional(),
+  ),
 })
 export type BusinessProfileFormValues = z.infer<typeof businessProfileSchema>
 
@@ -42,12 +54,49 @@ export const serviceFormSchema = z
       .transform((value) => value.toUpperCase()),
     durationMinutes: optionalPositiveInt,
     bookingType: z.enum(SERVICE_BOOKING_TYPES),
+    pricingUnit: z.union([z.enum(PRICING_UNITS), z.literal('')]).optional(),
   })
   .refine((data) => data.bookingType !== 'APPOINTMENT' || data.durationMinutes !== undefined, {
     message: 'Duration is required for appointment services',
     path: ['durationMinutes'],
   })
+  .refine((data) => data.bookingType !== 'RENTAL' || (data.pricingUnit === 'HOUR' || data.pricingUnit === 'DAY'), {
+    message: 'Pricing unit (per hour or per day) is required for rental services',
+    path: ['pricingUnit'],
+  })
 export type ServiceFormValues = z.infer<typeof serviceFormSchema>
+
+// -- Resource create/edit -----------------------------------------------------
+
+export const resourceFormSchema = z.object({
+  name: z.string().min(1, 'Name is required'),
+  type: z.string().min(1, 'Type is required'),
+  description: z.string(),
+  imageUrl: z.string(),
+  identifier: z.string().min(1, 'Identifier is required'),
+  status: z.enum(RESOURCE_STATUSES),
+})
+export type ResourceFormValues = z.infer<typeof resourceFormSchema>
+
+// -- Class create/edit ---------------------------------------------------------
+
+export const classFormSchema = z
+  .object({
+    name: z.string().min(1, 'Class name is required'),
+    description: z.string(),
+    staffId: z.string(),
+    startAt: z.string().min(1, 'Start time is required'),
+    endAt: z.string().min(1, 'End time is required'),
+    capacity: z.preprocess(
+      (value) => (value === '' ? undefined : Number(value)),
+      z.number().int('Must be a whole number').positive('Must be greater than 0'),
+    ),
+  })
+  .refine((data) => data.startAt < data.endAt, {
+    message: 'End time must be after start time',
+    path: ['endAt'],
+  })
+export type ClassFormValues = z.infer<typeof classFormSchema>
 
 // -- Staff create/edit --------------------------------------------------------
 

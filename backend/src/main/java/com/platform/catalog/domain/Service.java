@@ -41,6 +41,15 @@ public class Service extends BaseEntity {
     @Column(name = "booking_type", nullable = false)
     private ServiceBookingType bookingType;
 
+    /**
+     * The period {@code price} is quoted per for RENTAL services (per-hour or
+     * per-day). Null for every other booking type; required by
+     * {@code CatalogService} when bookingType = RENTAL.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "pricing_unit", length = 10)
+    private PricingUnit pricingUnit;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private ServiceStatus status = ServiceStatus.ACTIVE;
@@ -49,7 +58,7 @@ public class Service extends BaseEntity {
     }
 
     public Service(UUID businessId, String name, String description, BigDecimal price, String currency,
-                    Integer durationMinutes, ServiceBookingType bookingType) {
+                    Integer durationMinutes, ServiceBookingType bookingType, PricingUnit pricingUnit) {
         this.businessId = businessId;
         this.name = name;
         this.description = description;
@@ -57,16 +66,19 @@ public class Service extends BaseEntity {
         this.currency = currency;
         this.durationMinutes = durationMinutes;
         this.bookingType = bookingType;
+        this.pricingUnit = pricingUnit;
     }
 
     public void applyUpdate(String name, String description, BigDecimal price, String currency,
-                             Integer durationMinutes, ServiceBookingType bookingType, ServiceStatus status) {
+                             Integer durationMinutes, ServiceBookingType bookingType, PricingUnit pricingUnit,
+                             ServiceStatus status) {
         if (name != null) this.name = name;
         if (description != null) this.description = description;
         if (price != null) this.price = price;
         if (currency != null) this.currency = currency;
         if (durationMinutes != null) this.durationMinutes = durationMinutes;
         if (bookingType != null) this.bookingType = bookingType;
+        if (pricingUnit != null) this.pricingUnit = pricingUnit;
         if (status != null) this.status = status;
     }
 
@@ -100,6 +112,10 @@ public class Service extends BaseEntity {
 
     public ServiceBookingType getBookingType() {
         return bookingType;
+    }
+
+    public PricingUnit getPricingUnit() {
+        return pricingUnit;
     }
 
     public ServiceStatus getStatus() {
