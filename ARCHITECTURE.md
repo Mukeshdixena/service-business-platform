@@ -71,6 +71,18 @@ queue       — the QueueEntry aggregate, QueueStateMachine, and both the
 membership  — MembershipPlan + Membership aggregates, MembershipStateMachine,
               plan management + purchase/freeze/reactivate/cancel controllers,
               and the customer-facing /me/memberships controller
+attendance  — the Attendance aggregate (check-in/check-out) plus the derived
+              CapacityResponse; occupancy is COUNT(*) of open rows, never a
+              stored counter
+classes     — the ClassSession aggregate + ClassEnrollment, the waitlist
+              policy, the owner roster/attendance controllers and the
+              customer-facing /me/class-enrollments controller. Package is
+              `classes` (plural) and the entity is `ClassSession` because
+              `class` is a Java keyword and a type named `Class` would shadow
+              `java.lang.Class`; the wire contract still says "class"
+resource    — the Resource aggregate (bookable physical assets: JCBs, cars,
+              rooms). Rentals are NOT a separate aggregate — they are
+              Bookings carrying a `resourceId` (see section 11)
 customer    — CustomerProfile (platform-wide identity) + BusinessCustomer
               (per-business relationship), auto-created on first booking
 common      — exception (ApiException hierarchy + GlobalExceptionHandler),
@@ -317,20 +329,143 @@ mirroring `CatalogService.listActivePublic`'s pattern for services). This is
 computed in `DiscoveryService.dto()` for both the list/summary view and the
 full slug view, so it appears identically in each.
 
-## 10. What's deferred to later phases
+## 10. Attendance, capacity and classes (Phase 6)
+
+### Occupancy is always derived, never stored
+
+`CLAUDE_CODE.md` §18-19 is explicit that occupancy must not be stored as the
+only source of truth. There is therefore no `current_occupancy` column
+anywhere: `GET /businesses/{businessId}/capacity` issues a live
+`countByBusinessIdAndCheckOutAtIsNull` and returns
+`{ current, capacity, available }`. Only the *configured maximum*
+(`business.max_capacity`, nullable, `> 0` when set) is persisted, and it is
+edited through the existing `PATCH /businesses/{businessId}` rather than a new
+endpoint. When `max_capacity` is unset both `capacity` and `available` are
+`null` (unlimited/untracked), never `0` — the arithmetic lives in the pure
+`CapacityResponse.of(current, maxCapacity)` factory, so it is unit-testable and
+a venue that is over capacity reports `available: 0` rather than a negative
+number.
+
+### `ATTENDANCE_CONFLICT`
+
+`API_CONTRACT.md` left the choice open between reusing `BOOKING_CONFLICT` and
+adding a new code for "this customer already has an open attendance record".
+We added a dedicated **`ATTENDANCE_CONFLICT`** (409), following the existing
+`QUEUE_CONFLICT` precedent: a distinct code lets the frontend show "this member
+is already checked in" rather than the generic booking-slot message, and the
+response body is the same `{timestamp,status,code,message,path}` shape as every
+other `ApiException`. It is also raised when checking out an already-closed
+record. The duplicate check is serialized by the same Postgres advisory-lock
+pattern `BookingService`/`QueueService` use, and is backed by a partial unique
+index (`uq_attendance_open_per_customer ... WHERE check_out_at IS NULL`), so a
+race that somehow slipped past the application layer still cannot create a
+duplicate.
+
+Attendance is deliberately independent of membership (§18): holding an `ACTIVE`
+membership says nothing about whether the customer is currently on the
+premises, and check-in does not require one.
+
+### Classes: full means waitlist, not reject
+
+`enrolledCount` on `ClassDto` is a live count of `ENROLLED` enrollments, never
+a column. Enrolling into a full class produces a `WAITLISTED` enrollment rather
+than a 409 (`CLAUDE_CODE.md` §20) — the decision is a one-line pure function,
+`ClassEnrollmentPolicy.statusFor(enrolledCount, capacity)`, so the rule has
+exactly one implementation and a direct unit test. Enrollment is serialized on
+a per-class advisory lock so two simultaneous enrollments into the last seat
+cannot both read the same pre-full count.
+
+**Out of scope this phase:** automatic promotion of a `WAITLISTED` enrollment
+to `ENROLLED` when someone cancels. Nothing in `API_CONTRACT.md` exposes it,
+and doing it properly needs a defined promotion order plus customer
+notification (Phase 8). A cancelled seat simply frees capacity for whoever
+enrolls next. A duplicate active enrollment for the same (class, customer) is
+rejected with `VALIDATION_ERROR`, backed by a partial unique index that
+excludes `CANCELLED` rows so a customer who cancels can re-enroll later.
+
+Upcoming (`SCHEDULED`, future `startAt`) classes appear on `BusinessPublicDto`
+as a `classes` array, using exactly the same capability-gated pattern as
+`membershipPlans` (see section 9's "Discovery exposes active membership plans
+publicly").
+
+## 11. Resources and rentals (Phase 7)
+
+### Rentals reuse the Booking aggregate
+
+A rental is not a parallel booking system. `Booking` gained a nullable
+`resource_id`, and `BookingService.create` branches on the service's
+`bookingType`:
+
+| | APPOINTMENT | RENTAL |
+|---|---|---|
+| `staffId` | optional | rejected |
+| `resourceId` | rejected | required |
+| `endAt` | computed from `durationMinutes` (client value ignored) | required from the client, must be after `startAt` |
+| `price` | the service's price | `price × ceil(duration / pricingUnit)` |
+| business-hours check | enforced | skipped (see below) |
+
+`RENTAL` services carry a new `pricingUnit` (`HOUR`/`DAY`; nullable on the
+column, but required for `RENTAL` and validated at service create/update time),
+and their `price` is then the **per-unit rate**. The total is computed by the
+pure `RentalPricing.totalPrice(...)`, which *ceilings*: a 90-minute hourly hire
+is charged 2 hours, a 25-hour daily hire 2 days, and a rental is always charged
+at least one whole unit.
+
+The business-hours containment check is deliberately appointment-only. Opening
+hours constrain *when a customer collects* an asset, not how long they may hold
+it, and a multi-day JCB hire legitimately spans closing time. This is the one
+place the two booking kinds diverge in validation, and it is called out in a
+comment in `BookingService`.
+
+### One overlap rule for both kinds
+
+`CLAUDE_CODE.md` §34's rule (`requestedStart < existingEnd AND requestedEnd >
+existingStart`) now lives in a single pure class,
+`BookingConflictDetector.conflicts(start, end, staffId, resourceId,
+candidates)`, used by appointments and rentals alike — there is deliberately no
+second, subtly-different copy of the rule for rentals. The concurrency-safety
+mechanism is unchanged too: the same transaction-scoped Postgres advisory lock
+described in section 5, now keyed on `(businessId, staffId, resourceId)`, so
+two simultaneous rentals of the same JCB serialize exactly like two
+appointments with the same stylist. A rental is additionally rejected when the
+target resource's status is `MAINTENANCE` or `UNAVAILABLE`.
+
+### Rental availability reuses the availability endpoint
+
+`GET .../availability?serviceId=&resourceId=&date=` returns the same
+`AvailabilityResponse` shape with `type: "RENTAL"`, generating slots against
+the resource's existing non-terminal bookings instead of a staff member's.
+Two deliberate differences from appointment slots: the window is the whole
+calendar day rather than the business-hours intervals (consistent with the
+booking-creation rule above), and the slot length is the service's
+`pricingUnit` — hourly rentals get 24 hourly slots, daily rentals a single
+whole-day slot. `SlotCalculator` was refactored to expose a
+`generateWindow(start, end, ...)` primitive that both paths share, so the
+overlap/past-slot marking stays identical.
+
+Non-`UNAVAILABLE` resources appear on `BusinessPublicDto` as a `resources`
+array, gated on the `RESOURCES` *or* `RENTALS` capability since either implies
+a customer-visible fleet, so a customer can pick one before booking.
+`DELETE .../resources/{id}` is a soft delete to `UNAVAILABLE`, matching how
+services/staff/plans are already retired — historical bookings keep a valid
+foreign key.
+
+
+## 12. What's deferred to later phases
 
 Per the assignment's scope, the following `CLAUDE_CODE.md` entities/phases are
-**not** implemented and have **no** database tables yet: `Attendance`,
-`Resource` (rentals), `Class`/`ClassEnrollment`, `Review`, `Notification`,
-real payment-provider integration, and platform Admin APIs. The
+**not** implemented and have **no** database tables yet: `Review`,
+`Notification`, real payment-provider integration, and platform Admin APIs.
+(`Attendance`, `Resource`, and `Class`/`ClassEnrollment` were added in
+Phases 6-7 — see sections 10 and 11.) The
 `BusinessCapability` and `BusinessCategory` enums already declare every value
 those phases will need (`RENTALS`, `CLASSES`, `CAPACITY`, `RESOURCES`,
 `PAYMENTS`), so enabling a capability on a business today is
 forward-compatible with those phases without a schema migration to the enum
 itself. `ServiceBookingType` similarly already includes `REQUEST`/`RENTAL` —
-`QUEUE`/`WALK_IN` now have working queue-join logic as of this pass, and
-`APPOINTMENT` has working availability/booking logic, exactly as
-`API_CONTRACT.md` specifies.
+`QUEUE`/`WALK_IN` have working queue-join logic, and both `APPOINTMENT` and
+(as of Phase 7) `RENTAL` have working availability/booking logic. `REQUEST`
+remains stored-but-inert.
 
 `Business.status` also already models `SUSPENDED`/`ARCHIVED` for the future
 admin/moderation phase, even though this pass only exercises the

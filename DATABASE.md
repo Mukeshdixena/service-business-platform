@@ -1,7 +1,7 @@
-# DATABASE.md — Schema Overview (Phases 1-5)
+# DATABASE.md — Schema Overview (Phases 1-7)
 
 PostgreSQL, schema owned entirely by Flyway migrations under
-`backend/src/main/resources/db/migration/` (`V1` … `V7`). Hibernate's
+`backend/src/main/resources/db/migration/` (`V1` … `V13`). Hibernate's
 `ddl-auto` is `validate` in every profile — the application never generates or
 alters schema itself (`CLAUDE_CODE.md` §38). Every table has server-generated
 `UUID` primary keys (never sequential integers, to avoid IDOR-by-enumeration —
@@ -128,6 +128,108 @@ means a stale `status = ACTIVE` row can sit in the table indefinitely until
 something reads it, which is an accepted tradeoff for this phase (see
 `ARCHITECTURE.md`).
 
+## V8 — Business max capacity
+
+`ALTER TABLE business ADD COLUMN max_capacity INTEGER` plus
+`CHECK (max_capacity IS NULL OR max_capacity > 0)`. Nullable: only meaningful
+when the `CAPACITY` capability is enabled, and `null` means
+unlimited/not tracked (`CapacityResponse` then reports
+`capacity: null, available: null`, never `0`). It is the **configured maximum
+only** — current occupancy is never stored here, or anywhere (see V9).
+
+## V9 — Attendance
+
+| Table | Purpose |
+|---|---|
+| `attendance` | One visit: `check_in_at` (not null) and `check_out_at` (nullable). A row with `check_out_at IS NULL` is *open*. Attendance is deliberately separate from `membership` (`CLAUDE_CODE.md` §18) — an ACTIVE membership says nothing about whether the customer is on the premises. `CHECK (check_out_at IS NULL OR check_out_at >= check_in_at)`. |
+
+There is intentionally **no** `current_occupancy` counter column anywhere in
+the schema. Occupancy is always `COUNT(*) WHERE check_out_at IS NULL`
+(`CLAUDE_CODE.md` §18-19: "Do not store occupancy as the only source of
+truth").
+
+Indexes:
+- `idx_attendance_business_check_out_at` on `(business_id, check_out_at)` —
+  named explicitly per `CLAUDE_CODE.md` §38's
+  `attendance.business_id + check_out_at` guidance; this is the occupancy-count
+  and `?activeOnly=true` query path.
+- `idx_attendance_customer_id`.
+- `uq_attendance_open_per_customer` — a **partial** unique index on
+  `(business_id, customer_id) WHERE check_out_at IS NULL`, enforcing "at most
+  one open attendance record per customer per business" in the database as well
+  as in `AttendanceService`. The application check is serialized by a Postgres
+  advisory lock; this index is the backstop, and its partial predicate is what
+  allows the same customer to have many *closed* historical visits.
+
+## V10 — Classes
+
+| Table | Purpose |
+|---|---|
+| `class_session` | A scheduled class (`CLAUDE_CODE.md` §20): `name`, `description`, optional `staff_id` (the instructor), `start_at`/`end_at`, `capacity`, `status` (`SCHEDULED`/`CANCELLED`/`COMPLETED`). `CHECK (end_at > start_at)` and `CHECK (capacity > 0)`. |
+| `class_enrollment` | A customer's place in a class: `class_id`, `customer_id` (→ `customer_profile.id`), `status` (`ENROLLED`/`WAITLISTED`/`CANCELLED`/`ATTENDED`/`NO_SHOW`). |
+
+The table is named `class_session`, not `class`: `CLASS` is awkward to quote
+across tooling, and the JPA entity cannot sensibly be named `Class` (it would
+shadow `java.lang.Class`). The wire contract is unaffected — the API still
+speaks of "classes" and `ClassDto`.
+
+`enrolled_count` is intentionally **not** a column: `ClassDto.enrolledCount` is
+always a live `COUNT` of `class_enrollment` rows in `ENROLLED` status, the same
+"derive, don't store" rule applied to queue position and occupancy.
+
+Indexes:
+- `idx_class_session_business_start` on `(business_id, start_at)` — serves both
+  the owner's `?from=/&to=` listing and the public "upcoming classes" lookup.
+- `idx_class_session_business_status`.
+- `idx_class_enrollment_class_status` — serves the roster and the
+  `enrolledCount` aggregate.
+- `idx_class_enrollment_customer_id` — serves `GET /me/class-enrollments`.
+- `uq_class_enrollment_active_per_customer` — a partial unique index on
+  `(class_id, customer_id) WHERE status <> 'CANCELLED'`, so a customer holds at
+  most one live place in a class but can re-enroll after cancelling.
+
+## V11 — Resources
+
+| Table | Purpose |
+|---|---|
+| `resource` | A bookable physical asset (`CLAUDE_CODE.md` §11): JCB, car, bike, room, treatment chair. `name`, `type`, `description`, `image_url`, `identifier` (e.g. a registration plate), `status` (`AVAILABLE`/`RESERVED`/`IN_USE`/`MAINTENANCE`/`UNAVAILABLE`). |
+
+A first-class table rather than reusing `staff_member` — §11 is explicit that
+vehicles/equipment must not be modelled as staff, and a resource has no user
+linkage, no service assignments and its own status vocabulary. Deletion is
+soft (`status = UNAVAILABLE`), matching services/staff/membership plans, since
+historical bookings reference the row.
+
+Indexes: `idx_resource_business_id`, `idx_resource_business_status`.
+
+## V12 — Service pricing unit
+
+`ALTER TABLE service ADD COLUMN pricing_unit VARCHAR(10)` (`HOUR`/`DAY`).
+Nullable on the column but required by the application layer for
+`booking_type = 'RENTAL'`, where `service.price` becomes the **per-unit rate**
+and a rental booking's total is `price × ceil(duration / pricing_unit)`
+(`CLAUDE_CODE.md` §9: "Rental services may be priced by hour / day / custom
+period. The pricing model should be extensible"). The enum is the extension
+point for future custom periods; no schema change is needed to add one.
+
+## V13 — Booking resource link
+
+`ALTER TABLE booking ADD COLUMN resource_id UUID REFERENCES resource (id)`,
+plus `idx_booking_resource_id` and `idx_booking_resource_start` on
+`(resource_id, start_at)` — the rental equivalent of the existing
+`idx_booking_staff_id`, serving both the overlap check and resource
+availability.
+
+Rentals deliberately reuse the existing `booking` table rather than getting a
+parallel `rental` aggregate — `CLAUDE_CODE.md` §14 already lists `resourceId`
+on `Booking`. A booking is keyed on a staff member (APPOINTMENT) or on a
+resource (RENTAL), and §34's overlap rule is applied identically to whichever
+key is present. The column is nullable rather than being enforced by a DB-level
+`CHECK (staff_id IS NULL <> resource_id IS NULL)`, because an APPOINTMENT
+booking may legitimately have *neither* (a service with no staff assignment);
+the mutual exclusion is enforced in `BookingService` against the service's
+`booking_type`, which the `booking` row does not itself carry.
+
 ## Relationships at a glance
 
 ```
@@ -145,15 +247,18 @@ business ──< business_capability
          ──< booking (business_id, service_id, staff_id nullable)
          ──< queue_entry (business_id, service_id, staff_id nullable)
          ──< membership_plan ──< membership (business_id, membership_plan_id, customer_id)
+         ──< attendance (business_id, customer_id)
+         ──< class_session ──< class_enrollment (class_id, customer_id)
+         ──< resource ──< booking (resource_id, nullable — set for RENTAL bookings)
 ```
 
 ## Deliberate omissions this phase
 
-No tables exist yet for `attendance`, `resource`, `class`, `class_enrollment`,
-`review`, `notification`, or `payment` — these belong to Phases 6-8 per
-`CLAUDE_CODE.md` §42 and are intentionally out of scope for this migration
-set (see `ARCHITECTURE.md` §8). No `CASCADE` deletes are configured on any
+No tables exist yet for `review`, `notification`, or `payment` — these belong
+to Phase 8 per `CLAUDE_CODE.md` §42 and are intentionally out of scope for
+this migration set. (`attendance`, `class_session`/`class_enrollment` and
+`resource` arrived in V9-V11 as part of Phases 6-7.) No `CASCADE` deletes are configured on any
 foreign key: business/service/staff deletion is not implemented in this phase
 (services, staff, and membership plans are soft-deleted via a `status` flip to
-`INACTIVE`), so there was no scenario yet that required cascading behavior,
+`INACTIVE`; resources to `UNAVAILABLE` and classes to `CANCELLED`), so there was no scenario yet that required cascading behavior,
 and adding it without a real delete path would only obscure future intent.
