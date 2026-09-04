@@ -101,3 +101,15 @@ export type MembershipDurationUnit = (typeof MEMBERSHIP_DURATION_UNITS)[number]
 
 export const MEMBERSHIP_STATUSES = ['PENDING', 'ACTIVE', 'EXPIRED', 'FROZEN', 'CANCELLED'] as const
 export type MembershipStatus = (typeof MEMBERSHIP_STATUSES)[number]
+
+export const CLASS_STATUSES = ['SCHEDULED', 'CANCELLED', 'COMPLETED'] as const
+export type ClassStatus = (typeof CLASS_STATUSES)[number]
+
+export const CLASS_ENROLLMENT_STATUSES = ['ENROLLED', 'WAITLISTED', 'CANCELLED', 'ATTENDED', 'NO_SHOW'] as const
+export type ClassEnrollmentStatus = (typeof CLASS_ENROLLMENT_STATUSES)[number]
+
+export const RESOURCE_STATUSES = ['AVAILABLE', 'RESERVED', 'IN_USE', 'MAINTENANCE', 'UNAVAILABLE'] as const
+export type ResourceStatus = (typeof RESOURCE_STATUSES)[number]
+
+export const PRICING_UNITS = ['HOUR', 'DAY'] as const
+export type PricingUnit = (typeof PRICING_UNITS)[number]

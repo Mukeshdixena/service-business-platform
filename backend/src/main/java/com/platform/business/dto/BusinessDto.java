@@ -18,6 +18,7 @@ public record BusinessDto(
         Set<String> capabilities,
         String status,
         String verificationStatus,
+        Integer maxCapacity,
         Instant createdAt,
         Instant updatedAt
 ) {

@@ -49,6 +49,15 @@ public class Business extends BaseEntity {
     @Column(name = "verification_status", nullable = false)
     private VerificationStatus verificationStatus = VerificationStatus.UNVERIFIED;
 
+    /**
+     * Maximum simultaneous occupancy (CLAUDE_CODE.md §19). Nullable — only
+     * meaningful when the CAPACITY capability is enabled; null means
+     * "unlimited/not tracked". Current occupancy is NEVER stored here: it is
+     * always derived from open attendance records.
+     */
+    @Column(name = "max_capacity")
+    private Integer maxCapacity;
+
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "business_capability", joinColumns = @JoinColumn(name = "business_id"))
     @Enumerated(EnumType.STRING)
@@ -134,6 +143,14 @@ public class Business extends BaseEntity {
 
     public VerificationStatus getVerificationStatus() {
         return verificationStatus;
+    }
+
+    public Integer getMaxCapacity() {
+        return maxCapacity;
+    }
+
+    public void setMaxCapacity(Integer maxCapacity) {
+        this.maxCapacity = maxCapacity;
     }
 
     public Set<BusinessCapability> getCapabilities() {

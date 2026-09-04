@@ -6,6 +6,7 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Positive;
 
 import java.util.Set;
 
@@ -19,6 +20,8 @@ public record CreateBusinessRequest(
         String logoUrl,
         String coverImageUrl,
         @NotNull(message = "must not be null") BusinessCategory category,
-        Set<BusinessCapability> capabilities
+        Set<BusinessCapability> capabilities,
+        /** Only meaningful with the CAPACITY capability; must be > 0 when supplied. */
+        @Positive(message = "must be > 0") Integer maxCapacity
 ) {
 }

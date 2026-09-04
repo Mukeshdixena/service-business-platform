@@ -2,6 +2,7 @@ package com.platform.business.dto;
 
 import com.platform.business.domain.BusinessCapability;
 import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.Positive;
 
 import java.util.Set;
 
@@ -18,6 +19,7 @@ public record UpdateBusinessRequest(
         @Email(message = "must be a valid email") String email,
         String logoUrl,
         String coverImageUrl,
-        Set<BusinessCapability> capabilities
+        Set<BusinessCapability> capabilities,
+        @Positive(message = "must be > 0") Integer maxCapacity
 ) {
 }

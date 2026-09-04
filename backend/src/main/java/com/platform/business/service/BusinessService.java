@@ -52,6 +52,7 @@ public class BusinessService {
         if (request.capabilities() != null) {
             business.setCapabilities(request.capabilities());
         }
+        business.setMaxCapacity(request.maxCapacity());
         business = businessRepository.save(business);
         membershipRepository.save(new BusinessMembership(business.getId(), ownerUserId, BusinessMembershipRole.OWNER));
         return toDto(business);
@@ -78,6 +79,7 @@ public class BusinessService {
         if (request.logoUrl() != null) business.setLogoUrl(request.logoUrl());
         if (request.coverImageUrl() != null) business.setCoverImageUrl(request.coverImageUrl());
         if (request.capabilities() != null) business.setCapabilities(request.capabilities());
+        if (request.maxCapacity() != null) business.setMaxCapacity(request.maxCapacity());
         return toDto(business);
     }
 
@@ -105,6 +107,6 @@ public class BusinessService {
         Set<String> capabilities = b.getCapabilities().stream().map(Enum::name).collect(Collectors.toSet());
         return new BusinessDto(b.getId(), b.getName(), b.getSlug(), b.getDescription(), b.getPhone(), b.getEmail(),
                 b.getLogoUrl(), b.getCoverImageUrl(), b.getCategory().name(), capabilities, b.getStatus().name(),
-                b.getVerificationStatus().name(), b.getCreatedAt(), b.getUpdatedAt());
+                b.getVerificationStatus().name(), b.getMaxCapacity(), b.getCreatedAt(), b.getUpdatedAt());
     }
 }
