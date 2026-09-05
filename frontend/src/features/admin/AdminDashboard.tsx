@@ -3,7 +3,6 @@ import { useState } from 'react'
 import { Badge, Button, EmptyState, ErrorState, LoadingSpinner, Pagination, Select } from '../../components/ui'
 import { adminApi } from '../../services/api/adminApi'
 import { useToast } from '../../hooks/useToast'
-import type { AdminBusinessDto } from '../../types'
 import { formatDateTime } from '../../utils/date'
 
 const PAGE_SIZE = 20

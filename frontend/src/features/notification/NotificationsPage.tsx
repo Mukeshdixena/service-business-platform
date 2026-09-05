@@ -2,7 +2,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { NotificationCard } from '../../components/notification/NotificationCard'
 import { Button, EmptyState, ErrorState, LoadingSpinner, Pagination } from '../../components/ui'
 import { notificationApi } from '../../services/api/notificationApi'
-import type { NotificationDto } from '../../types'
 import { useState } from 'react'
 
 const PAGE_SIZE = 20
