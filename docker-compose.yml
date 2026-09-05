@@ -8,9 +8,6 @@ services:
       POSTGRES_USER: service_platform
       POSTGRES_PASSWORD: service_platform
     ports:
-      # Host port 55432 (not 5432) — this machine already runs native
-      # PostgreSQL services (v13 and v18) bound to 5432/5433, which silently
-      # shadow a container also mapped to one of those ports on localhost.
       - "55432:5432"
     volumes:
       - service_platform_pgdata:/var/lib/postgresql/data
@@ -19,6 +16,32 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+
+  backend:
+    build: ./backend
+    container_name: service-platform-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: jdbc:postgresql://postgres:5432/service_platform
+      DATABASE_USERNAME: service_platform
+      DATABASE_PASSWORD: service_platform
+      JWT_SECRET: docker-dev-secret-change-me-in-prod-0123456789
+      SPRING_PROFILES_ACTIVE: local
+      JAVA_OPTS: "-Xmx512m"
+    ports:
+      - "8080:8080"
+
+  frontend:
+    build: ./frontend
+    container_name: service-platform-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
 
 volumes:
   service_platform_pgdata:
