@@ -22,7 +22,7 @@ public class Review extends BaseEntity {
     @Column(name = "booking_id", nullable = false, unique = true)
     private UUID bookingId;
 
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "smallint")
     private int rating;
 
     private String comment;
