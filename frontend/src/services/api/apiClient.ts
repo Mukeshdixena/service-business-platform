@@ -40,7 +40,12 @@ export interface RequestOptions {
 }
 
 function buildUrl(path: string, query?: Record<string, QueryValue>): string {
-  const url = new URL(`${BASE_URL}${path}`)
+  const base = typeof window !== 'undefined' ? window.location.origin : 'http://localhost'
+  const fullPath = `${BASE_URL}${path}`
+  const url = fullPath.startsWith('http://') || fullPath.startsWith('https://')
+    ? new URL(fullPath)
+    : new URL(fullPath, base)
+
   if (query) {
     for (const [key, value] of Object.entries(query)) {
       if (value !== undefined && value !== null && value !== '') {

@@ -22,8 +22,8 @@ public class Review extends BaseEntity {
     @Column(name = "booking_id", nullable = false, unique = true)
     private UUID bookingId;
 
-    @Column(nullable = false, columnDefinition = "smallint")
-    private int rating;
+    @Column(nullable = false)
+    private Short rating;
 
     private String comment;
 
@@ -38,7 +38,7 @@ public class Review extends BaseEntity {
         this.businessId = businessId;
         this.customerProfileId = customerProfileId;
         this.bookingId = bookingId;
-        this.rating = rating;
+        this.rating = (short) rating;
         this.comment = comment;
         this.status = ReviewStatus.PENDING;
     }
@@ -46,11 +46,11 @@ public class Review extends BaseEntity {
     public UUID getBusinessId() { return businessId; }
     public UUID getCustomerProfileId() { return customerProfileId; }
     public UUID getBookingId() { return bookingId; }
-    public int getRating() { return rating; }
+    public int getRating() { return rating != null ? rating : 0; }
     public String getComment() { return comment; }
     public ReviewStatus getStatus() { return status; }
 
-    public void setRating(int rating) { this.rating = rating; }
+    public void setRating(int rating) { this.rating = (short) rating; }
     public void setComment(String comment) { this.comment = comment; }
 
     public void approve() {
